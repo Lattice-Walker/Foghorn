@@ -1,0 +1,25 @@
+{
+  "name": "foghorn",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Two-player co-op sudoku played through fog.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "stats": "tsx src/tools/stats.ts",
+    "dev": "vite --port 8000 --strictPort",
+    "dev:lan": "vite --port 8000 --strictPort --host",
+    "build": "vite build",
+    "preview": "vite preview --port 8000 --strictPort"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "jsdom": "^30.1.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.0"
+  }
+}

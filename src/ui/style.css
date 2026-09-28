@@ -1,0 +1,774 @@
+/*
+ * Colours taken from the lighthouse: deep navy sky, periwinkle cloud, one warm
+ * lantern gold. The palette does the work of the theme, so most rules below
+ * only reach for a token.
+ *
+ * The consequence worth knowing before editing: fog is the cloud, which makes
+ * it *lighter* than the board rather than darker. Anything drawn on top of fog
+ * — your digits, your pencil marks, every marker — therefore has to be dark
+ * enough to read against pale blue, not pale enough to read against navy.
+ */
+
+:root {
+  /* Sky */
+  --bg: #1b2440;
+  --bg-deep: #161e37;
+  --surface: #232e4f;
+  --surface-2: #2c395e;
+  --line: #33416a;
+  --line-strong: #4e5f92;
+
+  /* Light */
+  --text: #e9edf8;
+  --muted: #9ba8ce;
+  --given: #dde4f6;
+  --entered: #a9bcea;
+
+  /* The lantern */
+  --accent: #f2d489;
+  --accent-deep: #d8b25c;
+  --accent-ink: #2a2008;
+  /* The rim of a clearing both players can see into. */
+  --sight-glow: rgb(242 212 137 / 0.85);
+
+  /* Cloud */
+  --fog: #8b98c6;
+  --fog-ink: #2b3559;
+
+  --cell: #1a2340;
+  --selected: #3d5288;
+
+  --wrong: #e8949a;
+  --wrong-deep: #97303c;
+  --ok: #93d3ad;
+
+  /* Crayons, muted to sit inside the same weather. */
+  --c1: #c97b7b; --c2: #d3a071; --c3: #cfc08a;
+  --c4: #8fbb92; --c5: #7fb9b4; --c6: #8aa6d6;
+  --c7: #a396cd; --c8: #c495b8; --c9: #97a0b8;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 1420px;
+  margin: 0 auto;
+  padding: 24px 18px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---- surfaces ---- */
+
+.status,
+.players,
+.pane,
+.group {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 8px 24px -18px rgba(0, 0, 0, 0.7);
+}
+
+/* ---- header ---- */
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.brand { display: flex; align-items: center; gap: 14px; }
+.logo {
+  border-radius: 13px;
+  box-shadow: 0 3px 14px -4px rgba(0, 0, 0, 0.6);
+}
+
+h1 { margin: 0; font-size: 27px; letter-spacing: -0.02em; }
+.tagline { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+.meta { display: flex; gap: 8px; align-items: center; }
+.meta label { display: flex; gap: 7px; align-items: center; color: var(--muted); font-size: 13px; }
+
+input, button {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+input { width: 9ch; }
+/* Seeds are seven characters and `width` here is a border-box width, so 9ch
+   leaves the last one or two under the padding. */
+#seed { width: 12ch; }
+button { cursor: pointer; }
+button:hover { border-color: var(--line-strong); background: #35446e; }
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+button.active:hover { background: var(--accent-deep); }
+
+/* ---- status ---- */
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 11px 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.status strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.status .sub { color: var(--muted); }
+.status .clock { margin-left: auto; font-variant-numeric: tabular-nums; }
+.status .done { color: var(--ok); font-weight: 600; }
+
+.status .rating {
+  font: inherit;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 2px 9px;
+}
+.status .rating:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.status .rating strong { text-transform: capitalize; color: var(--accent); }
+
+/* ---- players ---- */
+
+/* The stats and the Players row share a line while a game is running: once you
+   have picked how you are playing, the Players row is only reporting state, and
+   two bars saying how things stand is one bar too many. Picking is different —
+   the flow below needs the width — so the row takes a line of its own again for
+   as long as `#connect-flow` has anything in it. */
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.topbar > .status { flex: 1 1 380px; }
+.topbar > .players { flex: 0 1 auto; }
+.topbar:has(#connect-flow:not(:empty)) > .status,
+.topbar:has(#connect-flow:not(:empty)) > .players { flex: 1 1 100%; }
+
+.players { padding: 12px 16px; }
+.players-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.players-bar .group-label,
+.players-bar .buttons,
+.players-bar .buttons button { flex: 0 0 auto; }
+.players-bar .hint { flex: 1 1 260px; margin: 0; }
+
+#connect-flow:not(:empty) {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 720px) {
+  #connect-flow:not(:empty) { grid-template-columns: 1fr 1fr; }
+}
+
+.players .step h4 {
+  margin: 0 0 5px;
+  font-size: 13px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.players .step h4 .n {
+  display: grid;
+  place-items: center;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.players .step p { margin: 0 0 8px; font-size: 12px; color: var(--muted); max-width: 60ch; }
+.players .code-block { display: flex; flex-direction: column; gap: 7px; }
+.players textarea {
+  font: 11px/1.45 ui-monospace, monospace;
+  width: 100%;
+  resize: vertical;
+  color: var(--text);
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  word-break: break-all;
+}
+.hint.good { color: var(--ok); }
+.hint.bad { color: var(--wrong); }
+
+/* The relay fields: wanted rarely, so folded away until a connection fails. */
+.players .relay { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+/* The flow is two columns of steps; the relay is not a step and belongs under
+   both, not stranded in the second one with a rule floating beside it. */
+#connect-flow .relay { grid-column: 1 / -1; margin-top: 0; }
+.players .relay summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.players .relay p { margin: 8px 0; font-size: 12px; color: var(--muted); max-width: 60ch; }
+.players .relay-fields { display: flex; flex-wrap: wrap; gap: 7px; }
+.players .relay-fields input {
+  font: 12px/1.45 ui-monospace, monospace;
+  flex: 1 1 180px;
+  min-width: 0;
+  color: var(--text);
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 10px;
+}
+
+/* ---- boards ---- */
+
+/* The grids and the controls sit side by side, because the controls are used
+   between glances at the board and a column that never moves is easier to aim
+   at than a row that slides down as the boards resize. The sidebar keeps a
+   fixed width so the digit pad stays the same shape whatever the boards do. */
+.play {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 18px;
+  align-items: start;
+}
+
+main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+
+/* Below this the sidebar would squeeze the boards harder than it is worth, so
+   the controls go back under them and spread out again. */
+@media (max-width: 1100px) {
+  .play { grid-template-columns: 1fr; }
+}
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+
+/* Online, you get your own board and nothing else: your partner's grid is the
+   thing the whole game is about not seeing. */
+main.online { grid-template-columns: minmax(0, 620px); justify-content: center; }
+main.online .pane:not(.mine) { display: none; }
+
+.pane { padding: 13px; transition: border-color 0.16s, box-shadow 0.16s; }
+.pane.active {
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 1px rgba(242, 212, 137, 0.18),
+              0 1px 2px rgba(0, 0, 0, 0.22),
+              0 8px 24px -18px rgba(0, 0, 0, 0.7);
+}
+
+.pane-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 11px; }
+.pane-head h2 { margin: 0; font-size: 15px; }
+.pane-head .fog-count { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+/* A size container, so the digits scale with the board instead of the window.
+   They were sized in `vw`, which only worked while the board's width tracked
+   the viewport's; once the board was sized to the height left over, a wide
+   window kept full-size digits in shrunken cells. A cell is a ninth of the
+   board, so 1cqmin is a ninth of a cell and the ratios below read directly. */
+.board {
+  position: relative;
+  aspect-ratio: 1;
+  touch-action: none;
+  container-type: size;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: repeat(9, 1fr) / repeat(9, 1fr);
+  background: var(--line-strong);
+  border: 2px solid var(--line-strong);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cell {
+  position: relative;
+  background: var(--cell);
+  border-right: 1px solid #2c3a60;
+  border-bottom: 1px solid #2c3a60;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  cursor: pointer;
+}
+.cell.box-left { border-left: 2px solid var(--line-strong); }
+.cell.box-top { border-top: 2px solid var(--line-strong); }
+.cell.edge-right { border-right: none; }
+.cell.edge-bottom { border-bottom: none; }
+
+/* Layering inside a board. Nothing between a cell's layers and `.board`
+   creates a stacking context, so these z-indexes and the marker layers'
+   interleave: fog, then colour, then lines, then what is written in the cell,
+   then dots and badges on top. */
+.cell > * { position: absolute; inset: 0; }
+.fog { z-index: 1; }
+.colour { z-index: 2; }
+.corner, .centre, .value { z-index: 4; }
+
+.colour { background: transparent; }
+.colour.c1, .colour.c2, .colour.c3, .colour.c4, .colour.c5,
+.colour.c6, .colour.c7, .colour.c8, .colour.c9 { opacity: 0.45; }
+.colour.c1 { background: var(--c1); } .colour.c2 { background: var(--c2); }
+.colour.c3 { background: var(--c3); } .colour.c4 { background: var(--c4); }
+.colour.c5 { background: var(--c5); } .colour.c6 { background: var(--c6); }
+.colour.c7 { background: var(--c7); } .colour.c8 { background: var(--c8); }
+.colour.c9 { background: var(--c9); }
+
+.value {
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-size: clamp(11px, 6.4cqmin, 34px);
+  font-weight: 500;
+  color: var(--entered);
+}
+.cell.given .value { color: var(--given); font-weight: 600; }
+.cell.wrong .value { color: var(--wrong); }
+.cell.wrong:not(.hidden) { background: #3a2334; }
+.cell.confirmed { cursor: default; }
+
+.corner {
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: 2px;
+  font-size: 10px;
+  font-size: clamp(6px, 2.1cqmin, 12px);
+  color: var(--muted);
+  line-height: 1;
+}
+.corner span { display: grid; place-items: center; }
+
+.centre {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-size: clamp(6px, 2.3cqmin, 13px);
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+/* A pencil mark for a digit already standing in this cell's row, column or box
+   on the player's own board. It contradicts the grid in front of them. */
+.corner span.clash,
+.centre span.clash { color: var(--wrong); font-weight: 600; }
+
+.cell.selected { background: var(--selected); }
+.cell.selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* ---- fog ---- */
+
+/* The cloud. Flat, so adjacent fogged cells read as one bank rather than
+   tiles: a per-cell texture restarts at every border and gives the grid away. */
+.fog { display: none; place-items: center; background: var(--fog); }
+.cell.hidden .fog { display: grid; }
+
+/* Fog is lighter than the board, so a player's own work has to darken to stay
+   readable on it. A digit showing through fog is always a wrong guess. */
+.cell.hidden .value { color: var(--wrong-deep); font-weight: 700; text-shadow: none; }
+.cell.hidden .corner,
+.cell.hidden .centre { color: var(--fog-ink); text-shadow: none; }
+.cell.hidden .corner span.clash,
+.cell.hidden .centre span.clash { color: var(--wrong-deep); }
+
+/* ---- shared sight ---- */
+
+/* Ground both players can see. No cell starts that way (R10b), so this light
+   marks what the solve opened up: one player's reveal reaching into what the
+   other already held.
+
+   The rim is one blurred shape built in `renderSight`, not a border per cell,
+   so a block of shared cells reads as a single lit clearing. The cells keep
+   their own centres — background, colour wash and digits are untouched — and
+   the light only gathers against the edge of the region. */
+.sight-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+/* Blurring halves the strength at the boundary, so the fill starts strong. */
+.sight-layer .sight-glow { fill: var(--sight-glow); }
+
+/* ---- markers ---- */
+
+.marker-layer { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+/* Lines run through cell centres, so they must not cover what is written
+   there. Dots and badges sit on borders and corners, and belong on top. */
+.marker-layer.under { z-index: 3; }
+.marker-layer.over { z-index: 5; }
+
+/* Every marker carries a dark outline, because each one has to read on navy
+   board and on pale cloud alike. */
+.marker-layer .dot { stroke: #141c33; stroke-width: 0.03; }
+.marker-layer .dot.light { fill: #f6f8fd; }
+.marker-layer .dot.dark { fill: #141c33; stroke: #f6f8fd; stroke-width: 0.035; }
+
+.marker-layer .edge-text {
+  fill: #f6f8fd;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: #141c33;
+  stroke-width: 0.07;
+  stroke-linejoin: round;
+}
+
+.marker-layer .line {
+  fill: none;
+  stroke-width: 0.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.92;
+}
+
+/* One colour per line rule, close to the usual variant-sudoku palette so the
+   shapes read the way they do elsewhere. */
+.marker-layer .line.whisper { stroke: #6fbf92; }
+.marker-layer .line.dutch { stroke: #e2953f; }
+.marker-layer .line.palindrome { stroke: #98a7b8; }
+.marker-layer .line.renban { stroke: #c46fd0; }
+.marker-layer .line.thermo { stroke: #8c9bb0; stroke-width: 0.2; }
+.marker-layer .line.region { stroke: #5aa2e8; }
+.marker-layer .line.entropic { stroke: #e0906f; }
+
+.marker-layer .bulb { stroke: none; opacity: 0.92; }
+.marker-layer .bulb.thermo { fill: #8c9bb0; }
+
+.marker-layer .chevron {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marker-layer .badge {
+  fill: var(--accent);
+  font-size: 0.34px;
+  text-anchor: middle;
+  dominant-baseline: hanging;
+  paint-order: stroke;
+  stroke: #141c33;
+  stroke-width: 0.06;
+  stroke-linejoin: round;
+}
+
+/* ---- controls ---- */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Not sticky: where the page scrolls, a sidebar taller than the viewport
+     sticks with its foot off the bottom and no way to reach it. Scrolling
+     along with the page costs nothing and always shows all of it. */
+  align-self: start;
+}
+
+@media (max-width: 1100px) {
+  .controls {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  /* Feedback belongs under the controls, not wedged into the last column. */
+  .controls .message { grid-column: 1 / -1; }
+}
+.group { padding: 13px; display: flex; flex-direction: column; gap: 10px; }
+.group-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+.buttons { display: flex; flex-wrap: wrap; gap: 7px; }
+.buttons button { flex: 1 1 auto; }
+.buttons button kbd { margin-left: 5px; opacity: 0.65; }
+button.wide { width: 100%; }
+
+/* The legend, which says what the rim around shared ground means. The swatch
+   is the rim in miniature: the same light, gathered against an edge and fading
+   inwards, over the same board colour. */
+.legend .hint { margin: 0; }
+.legend .swatch {
+  display: inline-block;
+  vertical-align: -3px;
+  width: 30px;
+  height: 16px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: var(--cell);
+}
+.legend .swatch.sight {
+  box-shadow: inset 0 0 7px 3px var(--sight-glow);
+}
+.hint { margin: 0; font-size: 12px; color: var(--muted); }
+
+.digits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+
+/* Each key previews the mark it makes, so the pad reads as what you are about
+   to write rather than as nine identical buttons. */
+.digits button {
+  display: flex;
+  min-height: 46px;
+  padding: 5px 8px;
+  line-height: 1;
+  transition: font-size 0.12s, background 0.12s, border-color 0.14s;
+}
+.digits.mode-normal button { align-items: center; justify-content: center; font-size: 19px; }
+/* Small, and tucked where the first corner mark lands. */
+.digits.mode-corner button {
+  align-items: flex-start;
+  justify-content: flex-start;
+  font-size: 10px;
+  color: var(--muted);
+}
+.digits.mode-centre button {
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.digits.mode-colour button {
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c2238;
+}
+.digits.mode-colour button[data-digit="1"] { background: var(--c1); border-color: var(--c1); }
+.digits.mode-colour button[data-digit="2"] { background: var(--c2); border-color: var(--c2); }
+.digits.mode-colour button[data-digit="3"] { background: var(--c3); border-color: var(--c3); }
+.digits.mode-colour button[data-digit="4"] { background: var(--c4); border-color: var(--c4); }
+.digits.mode-colour button[data-digit="5"] { background: var(--c5); border-color: var(--c5); }
+.digits.mode-colour button[data-digit="6"] { background: var(--c6); border-color: var(--c6); }
+.digits.mode-colour button[data-digit="7"] { background: var(--c7); border-color: var(--c7); }
+.digits.mode-colour button[data-digit="8"] { background: var(--c8); border-color: var(--c8); }
+.digits.mode-colour button[data-digit="9"] { background: var(--c9); border-color: var(--c9); }
+
+/* ---- footer ---- */
+
+.message {
+  min-height: 20px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.message.show { opacity: 1; }
+
+footer { color: var(--muted); font-size: 13px; display: grid; gap: 8px; }
+
+/* ---- fitting the window ----------------------------------------------- */
+
+/* Off by default; the media query below turns it on. */
+:root { --fits: 0; }
+
+/* Above this the whole page is one screen: nothing scrolls, and the boards take
+   whatever height the chrome leaves them (the arithmetic is in fit.ts). Below
+   it the grids would be too small to aim at, so the page goes back to scrolling
+   and the boards go back to being sized by their width. */
+@media (min-width: 1101px) and (min-height: 820px) {
+  /* fit.ts reads this rather than repeating the query above: two copies of a
+     breakpoint drift apart, and when they do the boards are sized for a layout
+     that is not on screen. */
+  :root { --fits: 1; }
+
+  html { height: 100%; }
+  body {
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Far wider than the scrolling layout allows: the boards are the page, and
+     every pixel of width withheld from them is a pixel of grid nobody can read.
+     `width: 100%` is load-bearing — `margin-inline: auto` cancels a flex item's
+     cross-axis stretch, so without it this collapses to its content width and
+     starves the boards on a wide screen. */
+  #app {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 2100px;
+    overflow: hidden;
+    padding: 16px 20px 8px;
+    gap: 10px;
+  }
+  .config-footer { flex: none; width: 100%; max-width: 2100px; padding-bottom: 10px; }
+
+  /* The boards row takes the slack; everything else keeps its own height. */
+  .play { flex: 1; min-height: 0; align-items: stretch; }
+  :root { --side-w: 290px; --side-cols: minmax(0, 1fr); }
+  main { min-height: 0; justify-items: center; align-items: start; }
+
+  /* A pane wraps its board and stops. Stretching it left a board adrift in a
+     tall empty box, which is what made the panel look broken. */
+  .pane {
+    width: fit-content;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .board { flex: none; }
+
+  /* Online there is one board and the whole row to put it in, so the 620px cap
+     that keeps it company-sized in the scrolling layout only wastes height. */
+  main.online { grid-template-columns: minmax(0, 1fr); }
+
+  /* Sticky has nothing to travel against once the page cannot scroll. */
+  .controls {
+    position: static;
+    max-height: 100%;
+    gap: 10px;
+    display: grid;
+    grid-template-columns: var(--side-cols);
+    align-content: start;
+    /* Each card hugs its own contents; stretching them to a common height only
+       pads the shorter one with empty panel. */
+    align-items: start;
+  }
+  /* Mode and digits are grids of small keys and take a narrow column happily.
+     The markers are named in words — "No neighbours", "Remove markers on
+     selection" — and a narrow column only makes them wrap taller, so they keep
+     the full width underneath. */
+  .controls .markers,
+  .controls .legend,
+  .controls .message { grid-column: 1 / -1; }
+  /* The board column is sized by the board, not by the space going spare, so
+     the controls sit against the grid instead of being flung to the far edge
+     with a field of background between. The pair is then centred together. */
+  .play {
+    grid-template-columns: max-content var(--side-w);
+    justify-content: center;
+  }
+
+  /* Equal shares rather than natural widths, so a row of keys stays a row
+     instead of spilling one key onto a second line. The floor is what the
+     label actually needs: an equal share is not worth a clipped word, and
+     "Delete" is wider than "Undo". Below that floor they wrap, as before. */
+  #markers button,
+  .pad .buttons button { flex: 1 1 0; min-width: fit-content; }
+  .group { padding: 9px; gap: 6px; }
+  .digits { gap: 6px; }
+  .digits button { min-height: 32px; }
+  .buttons { gap: 6px; }
+
+  /* It holds feedback and is blank most of the time; a blank line costs a row
+     of the sidebar it cannot spare. */
+  .controls .message:empty { display: none; }
+
+  /* The mode hint is static reference text and is repeated verbatim under
+     "Keys and rules"; the marker hint is not — it names whatever marker the
+     pointer is over — so that one stays. */
+  .modes .hint { display: none; }
+
+  /* The panels that expand are capped and scroll inside themselves, so opening
+     one costs the boards nothing. */
+  /* The panel is capped, so its one button has to be in view without scrolling
+     for it — a paste box you cannot submit is worse than no panel at all. Side
+     by side, the box and the button cost one row instead of two. */
+  .players { max-height: 210px; overflow-y: auto; }
+  .players .code-block { flex-direction: row; align-items: stretch; }
+  .players .code-block textarea { height: 64px; }
+  .players .code-block button { flex: 0 0 auto; }
+  .players .step p { margin-bottom: 6px; }
+  footer { max-height: 210px; overflow-y: auto; }
+  footer .help { max-height: 150px; overflow-y: auto; }
+}
+
+/* Two control columns instead of one, whenever the row beside the board is
+   short: either the window itself is short, or a panel has opened above and
+   taken the height. Both cases are the same problem, so both get the same
+   answer, and the boards pay for it in width — the cheaper loss, since a
+   slightly smaller grid beats a marker button sliced in half. */
+@media (min-width: 1101px) and (min-height: 820px) and (max-height: 1010px) {
+  :root { --side-w: 386px; --side-cols: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1101px) and (min-height: 820px) {
+  body:has(#connect-flow:not(:empty)),
+  body:has(footer details[open]) {
+    --side-w: 386px;
+    --side-cols: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The site footer, shared with the other Lattice-Walker pages. It lives outside
+   #app because main.ts replaces that element's contents wholesale, so anything
+   put inside would vanish on the first render. That also puts it outside #app's
+   max-width, hence the matching width and padding here. */
+.config-footer {
+  display: block;
+  max-width: 1420px;
+  margin: 0 auto;
+  padding: 0 18px 32px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.config-footer a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.config-footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.config-footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.config-footer .contact-sep { opacity: 0.45; }
+summary { cursor: pointer; }
+summary:hover { color: var(--text); }
+.help { padding-top: 12px; display: grid; gap: 11px; }
+.help dl { display: grid; grid-template-columns: max-content 1fr; gap: 5px 16px; margin: 0; }
+.help dt { color: var(--text); }
+.help dd { margin: 0; }
+.help p { margin: 0; max-width: 72ch; }
+
+.breakdown { border-collapse: collapse; font-size: 12px; }
+.breakdown th, .breakdown td { padding: 3px 16px 3px 0; text-align: left; }
+.breakdown th { font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--line); }
+.breakdown td { color: var(--text); }
+.breakdown .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+kbd {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font: 11px/1.6 ui-monospace, monospace;
+}

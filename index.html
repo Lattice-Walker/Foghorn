@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Foghorn</title>
+    <meta name="description" content="Two-player co-op sudoku played through fog." />
+    <link rel="icon" type="image/png" sizes="64x64" href="./icon-64.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png" />
+    <meta name="theme-color" content="#1b2440" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- Outside #app on purpose: main.ts rewrites that element's contents. -->
+    <footer class="config-footer">
+      <span class="contact-links">
+        <span class="contact-item"><a href="https://lattice-walker.github.io/CipherOps/index.html">Blog</a></span>
+        <span class="contact-sep">&nbsp;·&nbsp;</span>
+        <span class="contact-item"><a href="https://lattice-walker.github.io/CipherOps/contact/contact.html">Contact</a></span>
+        <span class="contact-sep">&nbsp;·&nbsp;</span>
+        <span class="contact-item"><a href="https://github.com/Lattice-Walker/Foghorn" target="_blank" rel="noopener">GitHub</a></span>
+      </span>
+    </footer>
+
+    <script type="module" src="/src/ui/main.ts"></script>
+  </body>
+</html>

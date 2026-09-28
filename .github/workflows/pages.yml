@@ -1,0 +1,59 @@
+# Build the site and publish it to GitHub Pages.
+#
+# Pages serves whatever it is pointed at. Pointed at the repository itself, it
+# serves the root index.html — which is Vite's development entry and loads raw
+# TypeScript, so the page comes up blank. What has to be published is the built
+# output in dist/, which is gitignored and only exists after a build.
+#
+# Hence this workflow: build in CI, upload dist/ as the Pages artifact.
+
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a deployment finish rather than cancelling it midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # A broken build should fail here rather than reach the live site.
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
