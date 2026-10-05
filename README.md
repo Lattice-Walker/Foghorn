@@ -1,7 +1,6 @@
 # Foghorn
 
-Two-player co-op sudoku played through fog. You each see half the grid and can
-signal, but never speak.
+Two-player co-op sudoku played through fog. You each see half the grid and can signal, but never speak.
 
 ## Design
 
@@ -63,3 +62,5 @@ and is not built yet.
 Next: the two-player spike — hardcoded split, three markers, no generation — to
 find out whether a marker-only solve loop reaches a fixed point at useful
 cooperation depth.
+
+The game's underlying systems and board generator are original, while the user interface was developed with the assistance of AI-based tools.
